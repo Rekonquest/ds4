@@ -240,6 +240,10 @@ typedef struct {
     size_t pending_len;
     char dsml_start_tail[64];
     size_t dsml_start_len;
+    char think_dsml_tail[32];
+    size_t think_dsml_len;
+    bool dsml_in_think;
+    bool dsml_in_think_reported;
     bool post_think_gap;
 } agent_stream_renderer;
 
@@ -550,6 +554,7 @@ static const char agent_tools_prompt_edit_line[] =
     "For a single line, use line=16 new=\"... new line ...\". Use new=\"\" to delete the line or range. "
     "Use range=\"all\" when replacing the whole file; this is "
     "an explicit whole-file rewrite and does not require a previous read.\n"
+    "If you use old/new, old must match exactly once in the current file; line/range are ignored in that mode.\n"
     "Use read raw=true only when you need undecorated file text.\n\n";
 
 static const char agent_tools_prompt_after_edit[] =
@@ -562,10 +567,10 @@ static const char agent_tools_prompt_after_edit[] =
     "\"required\":[\"command\"]}}}\n"
     "{\"type\":\"function\",\"function\":{\"name\":\"bash_status\",\"description\":\"Report current status and new output for a bash job.\","
     "\"parameters\":{\"type\":\"object\",\"properties\":{\"job\":{\"type\":\"number\"},"
-    "\"pid\":{\"type\":\"number\"}},\"required\":[\"job\"]}}}\n"
+    "\"pid\":{\"type\":\"number\"},\"refresh_sec\":{\"type\":\"number\"}},\"required\":[\"job\"]}}}\n"
     "{\"type\":\"function\",\"function\":{\"name\":\"bash_stop\",\"description\":\"Terminate a running bash job and report its final output.\","
     "\"parameters\":{\"type\":\"object\",\"properties\":{\"job\":{\"type\":\"number\"},"
-    "\"pid\":{\"type\":\"number\"}},\"required\":[\"job\"]}}}\n"
+    "\"pid\":{\"type\":\"number\"},\"refresh_sec\":{\"type\":\"number\"}},\"required\":[\"job\"]}}}\n"
     "{\"type\":\"function\",\"function\":{\"name\":\"read\",\"description\":\"Read a text file or a range of lines.\","
     "\"parameters\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},"
     "\"start_line\":{\"type\":\"number\"},\"max_lines\":{\"type\":\"number\"},"
@@ -586,7 +591,18 @@ static const char agent_tools_prompt_after_edit[] =
     "\"context\":{\"type\":\"number\"},\"max_results\":{\"type\":\"number\"},"
     "\"case_sensitive\":{\"type\":\"boolean\"}},\"required\":[\"query\"]}}}\n"
     "{\"type\":\"function\",\"function\":{\"name\":\"list\",\"description\":\"List one directory compactly.\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}}}\n";
+    "\"parameters\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}}}\n"
+    "\n"
+    "# Rules\n\n"
+    "- Always use strict syntax for DSML tool stanzas.\n"
+    "- This system runs on local inference of a few hundred tokens/s of prefill, "
+    "and a few tens of tokens/s decoding speed. Use tools and file/output reading "
+    "wisely to avoid very long pauses. Use line-based edit tools instead of "
+    "retyping old text whenever possible.\n"
+    "- Write code that is reliable and works well; always have a mental model of "
+    "what is going on in complex parts of the code.\n"
+    "- Work in a way that preserves the current system configuration integrity, "
+    "unless explicitly asked otherwise by the user.\n";
 
 static char *agent_build_tools_prompt(void) {
     const char *edit = agent_tools_prompt_edit_line;
@@ -1721,6 +1737,8 @@ static void agent_stream_finish_ignored_dsml(agent_stream_renderer *sr, const ch
     const char *msg =
         detail && detail[0] ? detail :
         "tool calling is not allowed inside <think></think>";
+    sr->dsml_in_think = true;
+    sr->dsml_in_think_reported = true;
     agent_trace(sr->renderer->worker, "dsml ignored inside thinking: %s", msg);
     if (!sr->renderer->last_output_newline)
         renderer_plain(sr->renderer, "\n", 1);
@@ -1797,6 +1815,7 @@ static void agent_stream_feed_dsml_byte(agent_stream_renderer *sr, char c) {
 static void agent_stream_start_dsml(agent_stream_renderer *sr, bool ignored) {
     sr->dsml_active = true;
     sr->dsml_ignored = ignored;
+    if (ignored) sr->dsml_in_think = true;
     sr->dsml_start_len = 0;
     sr->post_think_gap = false;
     agent_trace(sr->renderer->worker, "dsml start detected%s",
@@ -1832,11 +1851,38 @@ static bool agent_stream_dsml_start_match(const char *tail, size_t len,
     return false;
 }
 
+static bool agent_tail_matches(const char *tail, size_t len,
+                               const char *needle, size_t needle_len) {
+    return len >= needle_len &&
+           memcmp(tail + len - needle_len, needle, needle_len) == 0;
+}
+
+static void agent_stream_note_thinking_byte(agent_stream_renderer *sr, char c) {
+    if (!sr->in_think || sr->dsml_in_think) return;
+    if (sr->think_dsml_len == sizeof(sr->think_dsml_tail)) {
+        memmove(sr->think_dsml_tail, sr->think_dsml_tail + 1,
+                sizeof(sr->think_dsml_tail) - 1);
+        sr->think_dsml_len--;
+    }
+    sr->think_dsml_tail[sr->think_dsml_len++] = c;
+
+    static const char fullwidth_marker[] = "｜DSML｜";
+    static const char ascii_marker[] = "|DSML|";
+    if (agent_tail_matches(sr->think_dsml_tail, sr->think_dsml_len,
+                           fullwidth_marker, sizeof(fullwidth_marker) - 1) ||
+        agent_tail_matches(sr->think_dsml_tail, sr->think_dsml_len,
+                           ascii_marker, sizeof(ascii_marker) - 1))
+    {
+        sr->dsml_in_think = true;
+    }
+}
+
 /* Route ordinary assistant bytes either to normal markdown rendering or into
  * the DSML detector.  The detector must hold short prefixes because the model
  * can split "<｜DSML｜tool_calls>" across arbitrary tokens. */
 static void agent_stream_normal_byte(agent_stream_renderer *sr, char c) {
     static const char start[] = "<｜DSML｜tool_calls>";
+    agent_stream_note_thinking_byte(sr, c);
 
     /* DeepSeek usually emits one or more blank lines after </think> before
      * either prose or a DSML tool stanza.  At that point the bytes are just a
@@ -1968,6 +2014,10 @@ static void agent_stream_text(agent_stream_renderer *sr, const char *text, size_
                 agent_tool_viz_finish(sr, "[tool call interrupted]\n");
                 sr->dsml_active = false;
             }
+        }
+        if (sr->dsml_in_think && !sr->dsml_in_think_reported) {
+            agent_stream_finish_ignored_dsml(
+                sr, "tool calling is not allowed inside <think></think>");
         }
     }
 }
@@ -3423,6 +3473,121 @@ static void agent_worker_update_view_after_edit(agent_worker *w, const char *pat
     agent_line_spans_free(&new_spans);
 }
 
+static int agent_line_for_offset(const agent_line_spans *spans, size_t offset) {
+    if (!spans || spans->len <= 0) return 1;
+    for (int i = 0; i < spans->len; i++) {
+        if (offset < spans->v[i].end) return i + 1;
+    }
+    return spans->len;
+}
+
+static bool agent_old_new_line_effect(const char *old_data, size_t old_len,
+                                      const char *new_data, size_t new_len,
+                                      size_t edit_offset, size_t replaced_len,
+                                      int *start_line, int *end_line,
+                                      int *delta) {
+    agent_line_spans old_spans = {0};
+    agent_line_spans new_spans = {0};
+    agent_split_lines(old_data, old_len, &old_spans);
+    agent_split_lines(new_data, new_len, &new_spans);
+    bool ok = old_spans.len > 0;
+    if (ok) {
+        size_t old_last = edit_offset + replaced_len - 1;
+        if (old_last >= old_len) old_last = old_len ? old_len - 1 : 0;
+        if (start_line) *start_line = agent_line_for_offset(&old_spans, edit_offset);
+        if (end_line) *end_line = agent_line_for_offset(&old_spans, old_last);
+        if (delta) *delta = new_spans.len - old_spans.len;
+    }
+    agent_line_spans_free(&old_spans);
+    agent_line_spans_free(&new_spans);
+    return ok;
+}
+
+static void agent_worker_update_view_after_old_new(agent_worker *w,
+                                                   const char *path,
+                                                   const char *old_data,
+                                                   size_t old_len,
+                                                   const char *new_data,
+                                                   size_t new_len,
+                                                   size_t edit_offset,
+                                                   size_t replaced_len) {
+    agent_file_view *v = agent_file_view_get(w, path, false);
+    if (!v) return;
+
+    agent_line_spans old_spans = {0};
+    agent_line_spans new_spans = {0};
+    agent_split_lines(old_data, old_len, &old_spans);
+    agent_split_lines(new_data, new_len, &new_spans);
+    if (old_spans.len <= 0) {
+        agent_worker_forget_file_view(w, path);
+        agent_line_spans_free(&old_spans);
+        agent_line_spans_free(&new_spans);
+        return;
+    }
+
+    size_t old_last = edit_offset + replaced_len - 1;
+    if (old_last >= old_len) old_last = old_len ? old_len - 1 : 0;
+    int start_line = agent_line_for_offset(&old_spans, edit_offset);
+    int end_line = agent_line_for_offset(&old_spans, old_last);
+    int old_total = old_spans.len;
+    int new_total = new_spans.len;
+    int delta = new_total - old_total;
+
+    agent_line_view *old = NULL;
+    int remembered_len = v->len;
+    if (remembered_len > 0) {
+        old = xmalloc((size_t)remembered_len * sizeof(old[0]));
+        memcpy(old, v->lines, (size_t)remembered_len * sizeof(old[0]));
+    }
+
+    agent_file_view_resize(v, new_total);
+    for (int i = 0; i < new_total; i++) {
+        v->lines[i].known = false;
+        v->lines[i].crc = 0;
+    }
+
+    int before = start_line - 1;
+    if (before > remembered_len) before = remembered_len;
+    if (before > new_total) before = new_total;
+    for (int i = 0; i < before; i++) v->lines[i] = old[i];
+
+    /* The model supplied only an arbitrary old/new byte span, not necessarily
+     * whole rendered lines.  The touched lines are therefore stale until read
+     * again.  Lines after the edit remain trustworthy only if their numeric
+     * line positions did not shift. */
+    if (delta == 0) {
+        for (int old_line = end_line + 1; old_line <= remembered_len; old_line++) {
+            if (old_line <= 0 || old_line > new_total) continue;
+            v->lines[old_line - 1] = old[old_line - 1];
+        }
+    }
+
+    free(old);
+    agent_line_spans_free(&old_spans);
+    agent_line_spans_free(&new_spans);
+}
+
+static char *agent_edit_old_new_result(const char *path, int start_line,
+                                       int end_line, int delta) {
+    agent_buf b = {0};
+    char msg[PATH_MAX + 180];
+    snprintf(msg, sizeof(msg), "Edited %s using old/new replacement\n", path);
+    agent_buf_puts(&b, msg);
+    if (start_line > 0 && end_line >= start_line) {
+        snprintf(msg, sizeof(msg),
+                 "Touched lines %d-%d; read them again before line/range editing them.\n",
+                 start_line, end_line);
+        agent_buf_puts(&b, msg);
+        if (delta != 0) {
+            snprintf(msg, sizeof(msg),
+                     "Line shift: old lines after %d moved by %+d (old line %d is now line %d). Read again before editing shifted lines.\n",
+                     end_line, delta, end_line + 1, end_line + 1 + delta);
+            agent_buf_puts(&b, msg);
+        }
+    }
+    return agent_buf_take(&b);
+}
+
 static void agent_worker_set_more(agent_worker *w, const char *path,
                                   int next_line, bool bare) {
     snprintf(w->more_path, sizeof(w->more_path), "%s", path ? path : "");
@@ -3731,7 +3896,13 @@ static char *agent_tool_edit_old_new(agent_worker *w, const char *path, const ch
     memcpy(out + prefix + new_len, first + old_len, len - prefix - old_len);
     out[out_len] = '\0';
     int rc = agent_write_file_bytes(path, out, out_len, err, sizeof(err));
-    if (rc == 0) agent_worker_forget_file_view(w, path);
+    int start_line = 0, end_line = 0, delta = 0;
+    agent_old_new_line_effect(data, len, out, out_len, prefix, old_len,
+                              &start_line, &end_line, &delta);
+    if (rc == 0) {
+        agent_worker_update_view_after_old_new(w, path, data, len, out, out_len,
+                                               prefix, old_len);
+    }
     free(data);
     free(out);
     if (rc != 0) {
@@ -3741,9 +3912,7 @@ static char *agent_tool_edit_old_new(agent_worker *w, const char *path, const ch
         agent_buf_puts(&b, "\n");
         return agent_buf_take(&b);
     }
-    char msg[PATH_MAX + 96];
-    snprintf(msg, sizeof(msg), "Edited %s using old/new replacement\n", path);
-    return xstrdup(msg);
+    return agent_edit_old_new_result(path, start_line, end_line, delta);
 }
 
 static bool agent_parse_line_range_arg(const char *s, int *start, int *end) {
@@ -5074,6 +5243,12 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
 
         agent_stream_text(&stream, NULL, 0, true);
         renderer_finish(&renderer);
+        if (stream.dsml_in_think) {
+            got_tool = false;
+            malformed_tool = true;
+            snprintf(dsml.error, sizeof(dsml.error),
+                     "tool calling is not allowed inside <think></think>");
+        }
 
         if (generated == 0 && worker_should_interrupt(w)) {
             agent_dsml_parser_free(&dsml);
