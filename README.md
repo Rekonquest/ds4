@@ -62,8 +62,8 @@ That said, a few important things about this project:
 * The optimized graph path targets **Metal on macOS** and **CUDA on Linux**. The CPU path is only for correctness checks and model/tokenizer diagnostics. For CPU-only Linux builds, use `make cpu`; it builds the normal `./ds4` and `./ds4-server` binaries without CUDA or Metal. On macOS, **warning: current macOS versions have a bug in the virtual memory implementation that will crash the kernel** if you try to run the CPU code. Remember? Software sucks. It was not possible to fix the CPU inference to avoid crashing, since each time you have to restart the computer, which is not funny. Help us, if you have the guts.
 * The project supports both Flash and PRO variants, but Flash remains the main
   focus because it is the model that makes sense on 96/128GB personal machines.
-  PRO support is useful and welcome, but today it is naturally limited to people
-  with 512GB Mac Studio class hardware.
+  **PRO support is experimental**: it is useful and welcome, but today it is
+  naturally limited to people with 512GB Mac Studio class hardware.
 
 ## Acknowledgements to llama.cpp and GGML
 
