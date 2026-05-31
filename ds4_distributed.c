@@ -1275,6 +1275,7 @@ static int dist_bind_connect_source(int fd, int family, const char *host, int *b
 }
 
 static int dist_bind_connect_interface(int fd, int family, const char *ifname, int *bind_errno) {
+    (void)fd;
     if (bind_errno) *bind_errno = 0;
     if (!ifname || !ifname[0]) return 0;
 
