@@ -12,9 +12,9 @@ the provided CLI interface. There are also tools for GGUF and imatrix generation
 and for quality and speed testing.
 
 We support the following backends:
-* **Metal** is our primary target. Starting from MacBooks with 96GB of RAM.
-* **NVIDIA CUDA** with special care for the DGX Spark.
-* **AMD ROCm** is only supported in the [rocm](https://github.com/antirez/ds4/tree/rocm) branch. It is kept separate from main since I (antirez) don't have direct hardware access, so the community rebases the branch as needed.
+* **Metal** is our primary target. Starting from MacBooks with 96GB of RAM (or less, using SSD streaming).
+* **NVIDIA CUDA / DGX Spark**, CUDA with special care for the DGX Spark.
+* **Strix Halo (ROCm)**, systems like the Framework Desktop and other systems based on the same GPU and unified RAM design.
 
 This project would not exist without **llama.cpp and GGML**, make sure to read
 the acknowledgements section, a big thank you to Georgi Gerganov and all the
