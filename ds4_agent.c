@@ -145,6 +145,7 @@ typedef struct {
     bool more_valid;
     agent_bash_job *bash_jobs;
     int next_bash_job_id;
+    bool raw_mode_needs_restore;
 } agent_worker;
 
 static unsigned agent_next_prefill_label(void);
@@ -6586,6 +6587,7 @@ struct agent_bash_job {
     bool running;
     bool timed_out;
     struct agent_bash_job *next;
+    agent_worker *worker;  /* back-pointer for terminal state restoration */
 };
 
 static int agent_bash_display_lines(const agent_bash_job *job) {
@@ -6674,6 +6676,13 @@ static void agent_bash_finalize(agent_bash_job *job, int status) {
     else if (WIFSIGNALED(status)) job->exit_status = 128 + WTERMSIG(status);
     else job->exit_status = -1;
     job->running = false;
+    /* A child process (especially sh) may have changed the terminal mode
+     * from raw to cooked.  Notify the UI thread to restore raw mode. */
+    if (job->worker) {
+        pthread_mutex_lock(&job->worker->mu);
+        job->worker->raw_mode_needs_restore = true;
+        pthread_mutex_unlock(&job->worker->mu);
+    }
 }
 
 /* Drain available output, notice process exit, and enforce timeout.  This is
@@ -6741,6 +6750,17 @@ static agent_bash_job *agent_bash_start(agent_worker *w, const char *cmd,
     if (pid == 0) {
         setpgid(0, 0);
         close(tmpfd);
+        /* Redirect stdin to /dev/null so the shell does not attempt to
+         * change the terminal mode (cooked/raw) on the controlling
+         * terminal.  If the shell sets cooked mode while linenoise has
+         * raw mode active, the terminal becomes unresponsive to user
+         * input until the process exits and linenoise re-enables raw
+         * mode. */
+        int null_fd = open("/dev/null", O_RDONLY);
+        if (null_fd >= 0) {
+            dup2(null_fd, STDIN_FILENO);
+            close(null_fd);
+        }
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
@@ -6767,6 +6787,7 @@ static agent_bash_job *agent_bash_start(agent_worker *w, const char *cmd,
     job->timeout_sec = timeout_sec;
     job->exit_status = -1;
     job->running = true;
+    job->worker = w;
     job->next = w->bash_jobs;
     w->bash_jobs = job;
     return job;
@@ -8028,6 +8049,19 @@ static int set_nonblock(int fd, bool on, int *old_flags) {
     if (old_flags) *old_flags = flags;
     int next = on ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
     return fcntl(fd, F_SETFL, next);
+}
+
+/* Check and clear the raw_mode_needs_restore flag under the worker mutex.
+ * Returns true if the UI thread should call linenoiseRestoreRawMode(). */
+static bool worker_check_raw_mode_restore(agent_worker *w) {
+    bool needs = false;
+    pthread_mutex_lock(&w->mu);
+    if (w->raw_mode_needs_restore) {
+        w->raw_mode_needs_restore = false;
+        needs = true;
+    }
+    pthread_mutex_unlock(&w->mu);
+    return needs;
 }
 
 static void drain_wake_fd(int fd) {
@@ -9704,6 +9738,11 @@ static int run_agent(ds4_engine *engine, agent_config *cfg) {
     bool force_status_redraw_after_restart = false;
     char *restore_line = NULL;
     while (running) {
+        /* If a bash child process changed the terminal mode (e.g., from raw
+         * to cooked), restore raw mode so linenoise continues to work. */
+        if (worker_check_raw_mode_restore(&worker)) {
+            linenoiseRestoreRawMode();
+        }
         struct pollfd pfd[2] = {
             {.fd = STDIN_FILENO, .events = POLLIN},
             {.fd = worker.wake_fd[0], .events = POLLIN},
