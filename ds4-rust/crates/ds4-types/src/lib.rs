@@ -77,6 +77,7 @@ pub enum Ds4DistributedRole {
 pub enum Ds4QuantKind {
     Q8_0,
     Q4_K,
+    Q3_K,
     Q2_K,
     Iq2Xxs,
     F16,

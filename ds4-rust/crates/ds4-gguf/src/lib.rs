@@ -123,6 +123,7 @@ impl GgufDType {
             GgufDType::F16 => Ds4QuantKind::F16,
             GgufDType::Q8_0 => Ds4QuantKind::Q8_0,
             GgufDType::Q4_K => Ds4QuantKind::Q4_K,
+            GgufDType::Q3_K => Ds4QuantKind::Q3_K,
             GgufDType::Q2_K => Ds4QuantKind::Q2_K,
             GgufDType::Iq2Xxs => Ds4QuantKind::Iq2Xxs,
             _ => Ds4QuantKind::Q8_0,
@@ -572,6 +573,7 @@ fn str_to_quant(s: &str) -> Ds4QuantKind {
     match s {
         "Q8_0" => Ds4QuantKind::Q8_0,
         "Q4_K" => Ds4QuantKind::Q4_K,
+        "Q3_K" => Ds4QuantKind::Q3_K,
         "Q2_K" => Ds4QuantKind::Q2_K,
         "IQ2_XXS" => Ds4QuantKind::Iq2Xxs,
         "F16" => Ds4QuantKind::F16,
@@ -763,6 +765,7 @@ mod tests {
         assert_eq!(GgufDType::F16.as_ds4_quant_kind(), Ds4QuantKind::F16);
         assert_eq!(GgufDType::Q8_0.as_ds4_quant_kind(), Ds4QuantKind::Q8_0);
         assert_eq!(GgufDType::Q4_K.as_ds4_quant_kind(), Ds4QuantKind::Q4_K);
+        assert_eq!(GgufDType::Q3_K.as_ds4_quant_kind(), Ds4QuantKind::Q3_K);
         assert_eq!(GgufDType::Q2_K.as_ds4_quant_kind(), Ds4QuantKind::Q2_K);
         assert_eq!(GgufDType::Iq2Xxs.as_ds4_quant_kind(), Ds4QuantKind::Iq2Xxs);
     }
@@ -774,6 +777,7 @@ mod tests {
             GgufDType::F16,
             GgufDType::Q8_0,
             GgufDType::Q4_K,
+            GgufDType::Q3_K,
             GgufDType::Q2_K,
             GgufDType::Iq2Xxs,
         ] {
@@ -786,6 +790,7 @@ mod tests {
         assert_eq!(str_to_quant("Q8_0"), Ds4QuantKind::Q8_0);
         assert_eq!(str_to_quant("IQ2_XXS"), Ds4QuantKind::Iq2Xxs);
         assert_eq!(str_to_quant("Q4_K"), Ds4QuantKind::Q4_K);
+        assert_eq!(str_to_quant("Q3_K"), Ds4QuantKind::Q3_K);
         assert_eq!(str_to_quant("F32"), Ds4QuantKind::F32);
     }
 

@@ -19,6 +19,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub enum QuantKind {
     Q8_0,
     Q4_K,
+    Q3_K,
     Q2_K,
     Iq2Xxs,
     F16,
@@ -31,6 +32,7 @@ pub mod format;
 pub mod iq2_xxs;
 pub mod luts;
 pub mod q2_k;
+pub mod q3_k;
 pub mod q4_k;
 pub mod q8_0;
 

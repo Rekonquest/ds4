@@ -15,6 +15,7 @@ pub enum DType {
     F16,
     Q8_0,
     Q4_K,
+    Q3_K,
     Q2_K,
     Iq2Xxs,
 }
@@ -102,6 +103,7 @@ pub fn dtype_elem(d: DType) -> usize {
         DType::F16 => 2,
         DType::Q8_0 => 36, // f32 d + i8 qs[32]
         DType::Q4_K => 144,
+        DType::Q3_K => 110,
         DType::Q2_K => 84,
         DType::Iq2Xxs => 66,
     }
@@ -153,6 +155,7 @@ mod tests {
     fn dtype_elem_matches_block_sizes() {
         assert_eq!(dtype_elem(DType::Q8_0), 36);
         assert_eq!(dtype_elem(DType::Q4_K), 144);
+        assert_eq!(dtype_elem(DType::Q3_K), 110);
         assert_eq!(dtype_elem(DType::Q2_K), 84);
         assert_eq!(dtype_elem(DType::Iq2Xxs), 66);
     }

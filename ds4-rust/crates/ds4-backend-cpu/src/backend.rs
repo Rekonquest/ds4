@@ -22,6 +22,7 @@ use ds4_gguf::{GgufDType, GgufFile, TensorDescriptor};
 use ds4_quant::f16::F16;
 use ds4_quant::iq2_xxs::{self, Iq2XxsBlock};
 use ds4_quant::q2_k::{self, Q2_KBlock};
+use ds4_quant::q3_k::{self, Q3_KBlock};
 use ds4_quant::q4_k::{self, Q4_KBlock};
 use ds4_quant::q8_0::{self, Q8_0Block};
 use ds4_types::{Backend, BackendModel, Ds4Error, Ds4ErrorKind, Ds4QuantKind, Ds4Result};
@@ -693,6 +694,11 @@ impl CpuBackend {
                     total_elements += n_elems;
                     TensorData::F32(v)
                 }
+                GgufDType::Q3_K => {
+                    let v = decode_q3_k(&tensor)?;
+                    total_elements += n_elems;
+                    TensorData::F32(v)
+                }
                 GgufDType::Q2_K => {
                     let v = decode_q2_k(&tensor)?;
                     total_elements += n_elems;
@@ -818,6 +824,30 @@ fn decode_q4_k(tensor: &ds4_gguf::QuantizedTensor<'_>) -> Ds4Result<Vec<f32>> {
             qs,
         };
         q4_k::dequantize(&block, &mut scratch);
+        extend_logical(&mut out, &scratch, n);
+    }
+    Ok(out)
+}
+
+fn decode_q3_k(tensor: &ds4_gguf::QuantizedTensor<'_>) -> Ds4Result<Vec<f32>> {
+    let (n, blocks) = quant_shape(tensor, GgufDType::Q3_K, Q3_KBlock::BLOCK_SIZE, 110)?;
+    let mut out = Vec::with_capacity(n);
+    let mut scratch = [0.0f32; Q3_KBlock::BLOCK_SIZE];
+    for block_idx in 0..blocks {
+        let off = block_idx * 110;
+        let mut hmask = [0u8; 32];
+        let mut qs = [0u8; 64];
+        let mut scales = [0u8; 12];
+        hmask.copy_from_slice(&tensor.bytes[off..off + 32]);
+        qs.copy_from_slice(&tensor.bytes[off + 32..off + 96]);
+        scales.copy_from_slice(&tensor.bytes[off + 96..off + 108]);
+        let block = Q3_KBlock {
+            d: read_f16(tensor.bytes, off + 108),
+            hmask,
+            qs,
+            scales,
+        };
+        q3_k::dequantize(&block, &mut scratch);
         extend_logical(&mut out, &scratch, n);
     }
     Ok(out)
@@ -1223,6 +1253,55 @@ mod tests {
         };
         let decoded = decode_q4_k(&tensor).unwrap();
         assert_eq!(decoded, expected.to_vec());
+    }
+
+    type TestQ3ScaleBytes = [u8; 12];
+    type TestQ3SignedScales = [i8; 16];
+
+    fn pack_q3_scales(scales: TestQ3SignedScales) -> TestQ3ScaleBytes {
+        let mut out = [0u8; 12];
+        for (j, scale) in scales.iter().enumerate() {
+            let packed = (*scale + 32) as u8;
+            if j < 8 {
+                out[j] = packed & 0x0f;
+            } else {
+                out[j - 8] |= (packed & 0x0f) << 4;
+            }
+            out[j % 4 + 8] |= (packed >> 4) << (2 * (j / 4));
+        }
+        out
+    }
+
+    #[test]
+    fn decode_q3_k_tensor_to_f32_values() {
+        let mut signed_scales = [0i8; 16];
+        signed_scales[0] = 2;
+        let scales = pack_q3_scales(signed_scales);
+        let mut hmask = [0u8; 32];
+        for mask in hmask.iter_mut().take(16) {
+            *mask = 1;
+        }
+        let mut qs = [0u8; 64];
+        qs[0] = 3;
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&hmask);
+        bytes.extend_from_slice(&qs);
+        bytes.extend_from_slice(&scales);
+        bytes.extend_from_slice(&F16::from_f32(0.5).to_bits().to_le_bytes());
+        let descriptor = TensorDescriptor {
+            name: "q3.weight".to_string(),
+            dims: vec![Q3_KBlock::BLOCK_SIZE as u32],
+            dtype: ds4_gguf::GgufDType::Q3_K,
+            offset: 0,
+        };
+        let tensor = ds4_gguf::QuantizedTensor {
+            descriptor,
+            bytes: &bytes,
+        };
+        let decoded = decode_q3_k(&tensor).unwrap();
+        assert_eq!(decoded[0], 3.0);
+        assert!(decoded[1..].iter().all(|v| *v == 0.0));
     }
 
     #[test]

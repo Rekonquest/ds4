@@ -13,6 +13,7 @@ pub enum DType {
     F16,
     Q8_0,
     Q4_K,
+    Q3_K,
     Q2_K,
     Iq2Xxs,
 }
@@ -87,6 +88,7 @@ pub fn dtype_elem(d: DType) -> usize {
         DType::F16 => 2,
         DType::Q8_0 => 36,
         DType::Q4_K => 144,
+        DType::Q3_K => 110,
         DType::Q2_K => 84,
         DType::Iq2Xxs => 66,
     }
@@ -102,5 +104,10 @@ mod tests {
         let b = pool.alloc(DType::F32, 16);
         assert_eq!(b.len, 16);
         pool.release(b);
+    }
+
+    #[test]
+    fn dtype_elem_includes_q3_k() {
+        assert_eq!(dtype_elem(DType::Q3_K), 110);
     }
 }

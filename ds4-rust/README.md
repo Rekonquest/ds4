@@ -36,7 +36,7 @@ ds4-rust/
 | Crate                  | Role                                                                |
 |------------------------|---------------------------------------------------------------------|
 | `ds4-core`             | `Ds4Engine`, `Ds4Session`, sync state machine, KV, chat, sampler, MTP |
-| `ds4-quant`            | Q8_0, Q4_K, Q2_K, IQ2_XXS, F16/F32 dot / quant kernels              |
+| `ds4-quant`            | Q8_0, Q4_K, Q3_K, Q2_K, IQ2_XXS, F16/F32 dot / quant kernels        |
 | `ds4-tensor`           | typed wrapper over vendored candle-core                             |
 | `ds4-backend-cpu`      | correctness path on top of vendored tract-linalg                    |
 | `ds4-backend-cuda`     | CUDA kernel/toolchain surface; runtime model loading reports unavailable device execution |
