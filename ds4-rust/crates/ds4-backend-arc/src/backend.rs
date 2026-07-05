@@ -38,9 +38,9 @@ impl Backend for ArcBackend {
     }
 
     fn load_model(&self, path: &Path) -> Ds4Result<Box<dyn BackendModel>> {
-        let runtime = ArcRuntime::load()?;
         let gguf = GgufFile::open(path)?;
         let spec = ModelSpec::from_gguf(&gguf)?;
+        let runtime = ArcRuntime::load()?;
         let metadata = gguf.metadata.clone();
         let mut model = ArcModel {
             runtime,

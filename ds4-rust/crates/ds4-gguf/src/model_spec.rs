@@ -9,6 +9,8 @@ pub enum ArchitectureKind {
     Ds4,
     Qwen3,
     Qwen3Moe,
+    Qwen35,
+    Qwen35Moe,
     Unknown(String),
 }
 
@@ -124,9 +126,15 @@ impl ModelSpec {
 
         let arch_key = metadata.architecture.to_ascii_lowercase();
         let has_router = has_any_layer_tensor(&tensor_names, "ffn_gate_inp.weight");
+        let has_qwen35_hybrid = has_qwen35_hybrid_layout(&tensor_names);
+        let qwen35_family = is_qwen35_arch(&arch_key) || has_qwen35_hybrid;
         let has_experts = metadata.expert_count.unwrap_or(0) > 0 || has_router;
         let architecture = if arch_key.starts_with("ds4") {
             ArchitectureKind::Ds4
+        } else if qwen35_family && has_experts {
+            ArchitectureKind::Qwen35Moe
+        } else if qwen35_family {
+            ArchitectureKind::Qwen35
         } else if arch_key.contains("qwen") && has_experts {
             ArchitectureKind::Qwen3Moe
         } else if arch_key.contains("qwen") {
@@ -136,15 +144,6 @@ impl ModelSpec {
         } else {
             ArchitectureKind::Unknown(metadata.architecture.clone())
         };
-
-        let vocab = token_desc.dims[0] as usize;
-        let hidden = token_desc.dims[1] as usize;
-        if vocab == 0 || hidden == 0 {
-            return Err(Ds4Error::new(
-                Ds4ErrorKind::Model,
-                "token embedding dimensions must be nonzero",
-            ));
-        }
 
         let layers = metadata
             .layer_count
@@ -164,6 +163,7 @@ impl ModelSpec {
                 "attention head counts must be nonzero",
             ));
         }
+        let (vocab, hidden) = infer_token_embedding_dims(metadata, token_desc)?;
         let head_dim = metadata
             .head_dim
             .or_else(|| kv_u32(&kv_raw, &arch_key, "attention.key_length"))
@@ -214,6 +214,9 @@ impl ModelSpec {
             rope_freq_base,
             rms_norm_epsilon,
         };
+        if has_qwen35_hybrid {
+            return Err(qwen35_hybrid_layout_error(&tensor_names));
+        }
         let moe = if block_kind == TransformerBlockKind::RoutedMoe {
             Some(infer_moe_spec(metadata, &tensor_names)?)
         } else {
@@ -280,9 +283,53 @@ impl ModelSpec {
     fn is_qwen_like(&self) -> bool {
         matches!(
             self.architecture,
-            ArchitectureKind::Qwen3 | ArchitectureKind::Qwen3Moe
+            ArchitectureKind::Qwen3
+                | ArchitectureKind::Qwen3Moe
+                | ArchitectureKind::Qwen35
+                | ArchitectureKind::Qwen35Moe
         )
     }
+}
+
+fn is_qwen35_arch(arch_key: &str) -> bool {
+    arch_key.contains("qwen35")
+        || arch_key.contains("qwen3.5")
+        || arch_key.contains("qwen3_5")
+        || arch_key.contains("qwen3-5")
+        || arch_key.contains("qwen3next")
+        || arch_key.contains("qwen3_next")
+}
+
+fn has_qwen35_hybrid_layout(tensor_names: &HashSet<&str>) -> bool {
+    tensor_exists(tensor_names, "blk.0.attn_qkv.weight")
+        || has_any_layer_tensor(tensor_names, "attn_qkv.weight")
+        || has_any_layer_tensor(tensor_names, "ssm_a")
+        || has_any_layer_tensor(tensor_names, "ssm_conv1d.weight")
+        || has_any_layer_tensor(tensor_names, "ssm_out.weight")
+}
+
+fn qwen35_hybrid_layout_error(tensor_names: &HashSet<&str>) -> Ds4Error {
+    let mut found = Vec::new();
+    if has_any_layer_tensor(tensor_names, "attn_qkv.weight") {
+        found.push("attn_qkv.weight");
+    }
+    if has_any_layer_tensor(tensor_names, "ssm_a")
+        || has_any_layer_tensor(tensor_names, "ssm_conv1d.weight")
+        || has_any_layer_tensor(tensor_names, "ssm_out.weight")
+    {
+        found.push("SSM tensors");
+    }
+    let found = if found.is_empty() {
+        "Qwen3.5 metadata".to_string()
+    } else {
+        found.join(" and ")
+    };
+    Ds4Error::new(
+        Ds4ErrorKind::Model,
+        format!(
+            "Qwen3.5 hybrid QKV/SSM layout requires a Qwen3.5 execution path; found {found}, while this DS4 loader expects split attention tensors (attn_q/attn_k/attn_v) and Transformer FFN blocks"
+        ),
+    )
 }
 
 fn infer_moe_spec(metadata: &GgufMetadata, tensor_names: &HashSet<&str>) -> Ds4Result<MoeSpec> {
@@ -353,6 +400,68 @@ fn infer_ffn(
             .or_else(|| tensor_dim(tensor_index, "blk.0.ffn_gate_exps.weight", 1))
             .unwrap_or(hidden * 4),
     }
+}
+
+fn infer_token_embedding_dims(
+    metadata: &GgufMetadata,
+    token_desc: &TensorDescriptor,
+) -> Ds4Result<(usize, usize)> {
+    if token_desc.dims.len() != 2 {
+        return Err(Ds4Error::new(
+            Ds4ErrorKind::Model,
+            format!("invalid token_embd.weight shape {:?}", token_desc.dims),
+        ));
+    }
+
+    let a = token_desc.dims[0] as usize;
+    let b = token_desc.dims[1] as usize;
+    if a == 0 || b == 0 {
+        return Err(Ds4Error::new(
+            Ds4ErrorKind::Model,
+            "token embedding dimensions must be nonzero",
+        ));
+    }
+
+    if let Some(hidden) = metadata.embedding_dim.map(|v| v as usize) {
+        return match (a == hidden, b == hidden) {
+            (true, false) => Ok((b, a)),
+            (false, true) => Ok((a, b)),
+            (true, true) => Ok((a, b)),
+            (false, false) => Err(Ds4Error::new(
+                Ds4ErrorKind::Model,
+                format!(
+                    "token_embd.weight shape {:?} does not contain embedding_length {hidden}",
+                    token_desc.dims
+                ),
+            )),
+        };
+    }
+
+    if let Some(vocab) = metadata.vocab_size.map(|v| v as usize) {
+        return match (a == vocab, b == vocab) {
+            (true, false) => Ok((a, b)),
+            (false, true) => Ok((b, a)),
+            (true, true) => Ok((a, b)),
+            (false, false) => Err(Ds4Error::new(
+                Ds4ErrorKind::Model,
+                format!(
+                    "token_embd.weight shape {:?} does not contain vocab_size {vocab}",
+                    token_desc.dims
+                ),
+            )),
+        };
+    }
+
+    if let (Some(heads), Some(head_dim)) = (metadata.head_count, metadata.head_dim) {
+        let hidden = heads as usize * head_dim as usize;
+        return match (a == hidden, b == hidden) {
+            (true, false) => Ok((b, a)),
+            (false, true) => Ok((a, b)),
+            _ => Ok((a, b)),
+        };
+    }
+
+    Ok((a, b))
 }
 
 fn tensor_dim(
@@ -479,5 +588,64 @@ mod tests {
             }
             FfnTensorNames::Dense { .. } => panic!("expected routed MoE FFN"),
         }
+    }
+
+    #[test]
+    fn qwen_spec_accepts_hidden_first_token_embedding_shape() {
+        let metadata = GgufMetadata {
+            architecture: "qwen3".to_string(),
+            layer_count: Some(1),
+            embedding_dim: Some(2048),
+            head_count: Some(8),
+            kv_head_count: Some(2),
+            head_dim: Some(256),
+            feed_forward_length: Some(6144),
+            ..GgufMetadata::default()
+        };
+        let tensors = vec![
+            tensor("token_embd.weight", &[2048, 248_320]),
+            tensor("output.weight", &[2048, 248_320]),
+            tensor("output_norm.weight", &[2048]),
+            tensor("blk.0.attn_output.weight", &[2048, 2048]),
+            tensor("blk.0.ffn_gate.weight", &[2048, 6144]),
+        ];
+        let spec = ModelSpec::from_metadata(&metadata, &tensors, |_| None).unwrap();
+        assert_eq!(spec.architecture, ArchitectureKind::Qwen3);
+        assert_eq!(spec.dims.hidden, 2048);
+        assert_eq!(spec.dims.vocab, 248_320);
+        assert_eq!(spec.dims.head_dim, 256);
+    }
+
+    #[test]
+    fn qwen35_hybrid_layout_reports_architecture_requirement() {
+        let metadata = GgufMetadata {
+            architecture: "qwen35".to_string(),
+            layer_count: Some(1),
+            embedding_dim: Some(2048),
+            head_count: Some(8),
+            kv_head_count: Some(2),
+            head_dim: Some(256),
+            feed_forward_length: Some(6144),
+            ..GgufMetadata::default()
+        };
+        let tensors = vec![
+            tensor("token_embd.weight", &[2048, 248_320]),
+            tensor("output_norm.weight", &[2048]),
+            tensor("blk.0.attn_gate.weight", &[2048, 2048]),
+            tensor("blk.0.attn_norm.weight", &[2048]),
+            tensor("blk.0.attn_qkv.weight", &[2048, 6144]),
+            tensor("blk.0.ffn_down.weight", &[6144, 2048]),
+            tensor("blk.0.ffn_gate.weight", &[2048, 6144]),
+            tensor("blk.0.ffn_up.weight", &[2048, 6144]),
+            tensor("blk.0.post_attention_norm.weight", &[2048]),
+            tensor("blk.0.ssm_a", &[16]),
+            tensor("blk.0.ssm_conv1d.weight", &[4, 6144]),
+            tensor("blk.0.ssm_out.weight", &[2048, 2048]),
+        ];
+        let err = ModelSpec::from_metadata(&metadata, &tensors, |_| None).unwrap_err();
+        assert_eq!(err.kind, Ds4ErrorKind::Model);
+        assert!(err.message.contains("Qwen3.5 hybrid QKV/SSM"));
+        assert!(err.message.contains("attn_qkv.weight"));
+        assert!(err.message.contains("SSM tensors"));
     }
 }

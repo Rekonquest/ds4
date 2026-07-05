@@ -104,9 +104,9 @@ impl Backend for CudaBackend {
     }
 
     fn load_model(&self, path: &Path) -> Ds4Result<Box<dyn BackendModel>> {
-        let runtime = CudaRuntime::load()?;
         let gguf = GgufFile::open(path)?;
         let spec = ModelSpec::from_gguf(&gguf)?;
+        let runtime = CudaRuntime::load()?;
         let mut model = CudaModel::with_runtime(Arc::clone(&runtime), gguf.metadata.clone());
         model.spec = Some(spec);
         for descriptor in &gguf.tensors {

@@ -8,13 +8,30 @@ Vulkan, CUDA, ROCm, Metal, paged attention, server, CLI, GGUF, quantization,
 SSD expert-cache, KV-store, distributed protocol, tensor, imatrix, and shared
 type crates.
 
-Latest pushed commit: `6d9b1cf Add Vulkan backend capability layer`.
+Latest local verification pass: Qwen3.5 GGUF model-spec logic now recognizes
+hidden-first token embeddings and Qwen3.5 hybrid QKV/SSM layouts before backend
+runtime initialization.
 
 Current backend state:
 
 - `cpu`: GGUF-backed execution path with synthetic-model end-to-end coverage.
 - `arc`: Intel Arc OpenCL path wired for runtime discovery, tensor upload, and
   synthetic dense plus Qwen MoE GGUF execution tests.
+- `gguf/model-spec`: DS4, Qwen3 dense, Qwen3 MoE, and Qwen3.5 family metadata
+  are classified before tensor mapping. Dense Qwen hidden-first token embedding
+  shapes are accepted. Qwen3.5 hybrid files with fused `attn_qkv.weight` plus
+  SSM tensors are rejected with a direct architecture requirement instead of
+  falling through to the older split-QKV tensor path.
+- `qwen3.5 implementation references`: the vendored ggml tree already contains
+  the relevant source anchors for the next implementation pass:
+  `third_party/ggml/src/ggml-cpu/ops.cpp` for CPU SSM and gated-delta reference
+  logic, `third_party/ggml/src/ggml-opencl/kernels/{ssm_conv.cl,gated_delta_net.cl}`
+  for Intel Arc/OpenCL, `third_party/ggml/src/ggml-vulkan/ggml-vulkan.cpp` for
+  Vulkan pipeline creation/dispatch, and
+  `third_party/ggml/src/ggml-cuda/{ssm-conv.cu,ssm-scan.cu}` for CUDA kernels.
+  LM Studio also has usable local runtime binaries under
+  `C:\Users\jgali\.lmstudio\extensions\backends\llama.cpp-*`, but those are
+  packaged DLL/Node artifacts rather than source files.
 - `vulkan`: selectable through `--backend vulkan`, `--backend vulcan`, and
   `--backend vk`; loads `vulkan-1.dll`, discovers compute-capable devices,
   prefers Intel Arc when present, creates a logical device and compute queue,
@@ -32,6 +49,10 @@ Latest verification run:
 | Vulkan device probe | `vulkaninfo.exe --summary` | passed; saw RTX 5070 Ti, Intel Arc A380, and UHD 770 |
 | Format | `cargo fmt --all --check` | passed |
 | Typecheck | `RUSTFLAGS=-D warnings cargo check --workspace --all-targets --all-features` | passed |
+| Qwen model-spec regression | `RUSTFLAGS=-D warnings cargo test -p ds4-gguf qwen -- --nocapture` | passed; 4 Qwen-related tests |
+| Real Qwen3.5 2B CPU load | `cargo run -p ds4-cli -- --model F:\primitve inferrence engine\Qwen3.5-2B-GGUF\Qwen3.5-2B-UD-Q8_K_XL.gguf --backend cpu --ctx 128 --n-predict 1 hello` | expected fail-closed result: Qwen3.5 hybrid QKV/SSM layout requires a Qwen3.5 execution path |
+| Real Qwen3.5 2B Arc load | `cargo run -p ds4-cli -- --model F:\primitve inferrence engine\Qwen3.5-2B-GGUF\Qwen3.5-2B-UD-Q8_K_XL.gguf --backend arc --ctx 128 --n-predict 1 hello` | expected fail-closed result before Arc runtime initialization: Qwen3.5 hybrid QKV/SSM layout requires a Qwen3.5 execution path |
+| LM Studio Qwen3.5 9B Q4_K_M CPU load | `cargo run -p ds4-cli -- --model C:\Users\jgali\.lmstudio\models\HauhauCS\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive\Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf --backend cpu --ctx 128 --n-predict 1 hello` | expected fail-closed result: same Qwen3.5 hybrid QKV/SSM architecture boundary |
 | Clippy | `RUSTFLAGS=-D warnings cargo clippy --workspace --all-targets --all-features -- -D warnings` | passed |
 | Tests | `RUSTFLAGS=-D warnings cargo test --workspace --all-features -- --nocapture` | passed |
 | Build | `RUSTFLAGS=-D warnings cargo build --workspace --all-features` | passed |

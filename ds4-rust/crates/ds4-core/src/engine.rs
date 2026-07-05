@@ -114,17 +114,27 @@ impl Ds4Engine {
         };
 
         let (n_layers, n_vocab, hidden_f32_values, has_mtp) = if let Some(g) = gguf.as_ref() {
-            let nl = g
-                .metadata
-                .layer_count
-                .unwrap_or_else(|| g.n_tensors().max(1) as u32) as usize;
-            let nv = g.metadata.vocab_size.unwrap_or(129_280) as usize;
-            (
-                nl,
-                nv,
-                1,
-                opts.mtp_path.is_some() || opts.mtp_draft_tokens > 0,
-            )
+            if let Ok(spec) = ds4_gguf::ModelSpec::from_gguf(g) {
+                (
+                    spec.dims.layers,
+                    spec.dims.vocab,
+                    spec.dims.hidden,
+                    opts.mtp_path.is_some() || opts.mtp_draft_tokens > 0,
+                )
+            } else {
+                let nl = g
+                    .metadata
+                    .layer_count
+                    .unwrap_or_else(|| g.n_tensors().max(1) as u32)
+                    as usize;
+                let nv = g.metadata.vocab_size.unwrap_or(129_280) as usize;
+                (
+                    nl,
+                    nv,
+                    1,
+                    opts.mtp_path.is_some() || opts.mtp_draft_tokens > 0,
+                )
+            }
         } else {
             (0, 0, 0, opts.mtp_draft_tokens > 0)
         };
