@@ -55,6 +55,7 @@ pub enum Ds4Backend {
     Metal,
     Cuda,
     Arc,
+    Vulkan,
     Rocm,
     Cpu,
 }

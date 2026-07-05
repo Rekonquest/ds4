@@ -320,6 +320,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ds4-backend-vulkan"
+version = "0.1.0"
+dependencies = [
+ "ds4-gguf",
+ "ds4-types",
+]
+
+[[package]]
 name = "ds4-cli"
 version = "0.1.0"
 dependencies = [
@@ -346,6 +354,7 @@ dependencies = [
  "ds4-backend-cuda",
  "ds4-backend-metal",
  "ds4-backend-rocm",
+ "ds4-backend-vulkan",
  "ds4-dist",
  "ds4-gguf",
  "ds4-kvstore",

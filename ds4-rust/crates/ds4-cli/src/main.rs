@@ -53,7 +53,7 @@ struct Cli {
     #[arg(long, default_value_t = 1, global = true)]
     threads: usize,
 
-    /// Backend to request: cpu, cuda, rocm, or metal.
+    /// Backend to request: cpu, cuda, arc, vulkan, rocm, or metal.
     #[arg(long, default_value = "cpu", value_parser = parse_backend, global = true)]
     backend: Ds4Backend,
 
@@ -109,10 +109,11 @@ fn parse_backend(value: &str) -> Result<Ds4Backend, String> {
         "cpu" => Ok(Ds4Backend::Cpu),
         "cuda" => Ok(Ds4Backend::Cuda),
         "arc" | "intel-arc" | "xpu" => Ok(Ds4Backend::Arc),
+        "vulkan" | "vulcan" | "vk" => Ok(Ds4Backend::Vulkan),
         "rocm" => Ok(Ds4Backend::Rocm),
         "metal" => Ok(Ds4Backend::Metal),
         other => Err(format!(
-            "unknown backend {other:?}; expected cpu, cuda, arc, rocm, or metal"
+            "unknown backend {other:?}; expected cpu, cuda, arc, vulkan, rocm, or metal"
         )),
     }
 }
@@ -220,6 +221,8 @@ mod tests {
         assert_eq!(parse_backend("CUDA").unwrap(), Ds4Backend::Cuda);
         assert_eq!(parse_backend("arc").unwrap(), Ds4Backend::Arc);
         assert_eq!(parse_backend("xpu").unwrap(), Ds4Backend::Arc);
+        assert_eq!(parse_backend("vulkan").unwrap(), Ds4Backend::Vulkan);
+        assert_eq!(parse_backend("vulcan").unwrap(), Ds4Backend::Vulkan);
         assert!(parse_backend("bogus").is_err());
     }
 }
