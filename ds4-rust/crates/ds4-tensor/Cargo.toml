@@ -1,0 +1,47 @@
+[package]
+name = "ds4-tensor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) — typed tensor wrapper over vendored candle-core"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+half = { workspace = true }
+
+# Vendored candle-core path dep.
+#
+# Intentionally NOT declared right now: the vendored manifest at
+# `third_party/candle-core/candle-core/Cargo.toml` inherits from a
+# parent Cargo workspace (`version.workspace = true`, every
+# dependency that uses `workspace = true`, etc.) which the
+# upstream `huggingface/candle` workspace provided. We vendored
+# only the inner `candle-core/` subcrate without its surrounding
+# workspace, so cargo fails to parse the manifest with
+#
+#   error inheriting `description` from workspace root manifest's
+#   `workspace.package.description`
+#   `workspace.package.description` was not defined
+#
+# Because cargo parses the manifest of *every* dependency listed in
+# a member crate's `[dependencies]` table — even optional ones,
+# even unused ones — the path dep cannot be present in this file
+# until the upstream manifest is patched. The full failure trail is
+# reproduced in `src/lib.rs`. To re-enable the path dep, replace the
+# block below with:
+#
+#   candle-core = { path = "../../third_party/candle-core/candle-core", optional = true }
+#
+# and add a `vendored-candle = ["dep:candle-core"]` feature.
+
+[features]
+default = []
+# vendored-candle = ["dep:candle-core"]  # see note above

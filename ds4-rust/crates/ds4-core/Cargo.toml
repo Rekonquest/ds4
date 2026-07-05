@@ -1,0 +1,54 @@
+[package]
+name = "ds4-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) engine, session, sync state machine, KV, chat, sampler, and MTP"
+
+[lints]
+workspace = true
+
+[dependencies]
+ds4-types = { workspace = true }
+ds4-gguf = { workspace = true }
+ds4-backend-cpu = { workspace = true }
+ds4-backend-cuda = { workspace = true }
+ds4-backend-metal = { workspace = true }
+ds4-backend-rocm = { workspace = true }
+ds4-quant = { workspace = true }
+ds4-tensor = { workspace = true }
+ds4-kvstore = { workspace = true }
+ds4-ssd = { workspace = true }
+ds4-dist = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+parking_lot = { workspace = true }
+memmap2 = { workspace = true }
+half = { workspace = true }
+byteorder = { workspace = true }
+sha1 = { workspace = true }
+libc = { workspace = true }
+rand = { workspace = true }
+log = { workspace = true }
+crc32fast = { workspace = true }
+
+# Official-vector regression harness. Lives at the workspace root
+# under `tests/regression.rs` so the golden corpus
+# (`tests/test-vectors/`) can be carried over verbatim from the C
+# DS4 project. Cargo discovers it via this explicit `[[test]]` entry
+# because the workspace root has no [package] section.
+[[test]]
+name = "regression"
+path = "../../tests/regression.rs"
+harness = true
+
+# End-to-end forward-pass test. Uses a synthetic 1-layer`r`n# 8-hidden-dim attention-only GGUF and loads it via CpuBackend.
+[[test]]
+name = "end_to_end"
+path = "tests/end_to_end.rs"
+harness = true

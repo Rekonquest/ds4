@@ -1,0 +1,18 @@
+[package]
+name = "ds4-quant"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) — quantization kernels: Q8_0, Q4_K, Q2_K, IQ2_XXS, F16/F32"
+
+[lints]
+workspace = true
+
+[dependencies]
+half = { workspace = true }
+thiserror = { workspace = true }
+crc32fast = { workspace = true }

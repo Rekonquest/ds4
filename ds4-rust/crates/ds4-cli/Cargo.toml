@@ -1,0 +1,29 @@
+[package]
+name = "ds4-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) — CLI binary (replaces ds4_cli.c + ds4_help.c)"
+
+[[bin]]
+name = "ds4"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+ds4-types = { workspace = true }
+ds4-core = { workspace = true }
+ds4-backend-cpu = { workspace = true }
+clap = { workspace = true }
+rustyline = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+rand = { workspace = true }

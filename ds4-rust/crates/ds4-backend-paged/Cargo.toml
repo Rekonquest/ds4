@@ -1,0 +1,67 @@
+[package]
+name = "ds4-backend-paged"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) — paged-attention backend (clean-Rust reference; vendored mistralrs-paged-attn not wired until its manifest is patched)"
+
+[lints]
+workspace = true
+
+[dependencies]
+ds4-types = { workspace = true }
+ds4-gguf = { workspace = true }
+ds4-quant = { workspace = true }
+ds4-tensor = { workspace = true }
+thiserror = { workspace = true }
+
+# Vendored `mistralrs-paged-attn` integration notes
+# -------------------------------------------------
+# `third_party/mistralrs-paged-attn/mistralrs-paged-attn/Cargo.toml`
+# is a verbatim copy from upstream mistral.rs and still inherits:
+#   version.workspace = true
+#   edition.workspace = true
+#   description.workspace = true
+#   repository.workspace = true
+#   keywords.workspace = true
+#   categories.workspace = true
+#   license.workspace = true
+#   homepage.workspace = true
+#   candle-core.workspace = true
+#   half.workspace = true
+#   float8.workspace = true
+#   thiserror.workspace = true
+#   [cuda]    cudaforge.workspace = true
+#   [metal]   objc2-metal.workspace = true
+#             objc2-foundation.workspace = true
+#             dispatch2.workspace = true
+#             candle-metal-kernels.workspace = true
+#             mistralrs-metal-compile.workspace = true
+#
+# None of those workspace keys are defined in the DS4 workspace,
+# and cargo parses the manifest of every dependency — even optional
+# ones — so we cannot declare a path dep on the vendored crate
+# until the upstream manifest is patched (or the upstream mistral.rs
+# workspace is vendored wholesale).
+#
+# The clean-Rust implementation in `paged_attention.rs` is therefore
+# the correctness reference; the vendored kernel is the optimization
+# path. To wire it up:
+#   1. Either patch the vendored manifest to inline the workspace
+#      fields (preferred for a minimal change), or vendor the
+#      upstream mistral.rs workspace and add it as a workspace
+#      member.
+#   2. Re-add the path dep + feature here:
+#        mistralrs-paged-attn = { path = "...", optional = true }
+#        [features]
+#        vendored = ["dep:mistralrs-paged-attn"]
+#   3. Flip `paged_attention::vendored_status()` and the backend's
+#      `uses_vendored_kernel` flag on the feature.
+#
+# Until then, this crate builds against `ds4-types` + `ds4-quant` +
+# `ds4-tensor` only, ships the reference kernel, and reports
+# `vendored_status() == false`.

@@ -9,6 +9,8 @@
 /ds4flash.gguf
 /TODO.md
 /gguf/
+/.zcode-memory/
+/ds4-rust/.zcode-memory/
 *.o
 *.dSYM/
 __pycache__/

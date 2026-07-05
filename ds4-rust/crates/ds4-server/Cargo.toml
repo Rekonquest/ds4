@@ -1,0 +1,37 @@
+[package]
+name = "ds4-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "DS4 (DwarfStar) — HTTP server binary (replaces ds4_server.c)"
+
+[[bin]]
+name = "ds4-server"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+ds4-types = { workspace = true }
+ds4-core = { workspace = true }
+ds4-kvstore = { workspace = true }
+ds4-backend-cpu = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+rand = { workspace = true }
+parking_lot = { workspace = true }
+bytes = { workspace = true }
+http-body-util = { workspace = true }

@@ -1,0 +1,180 @@
+DS4 (DwarfStar) — Rust rewrite
+                  License and attribution notice
+
+The Rust code in this repository is dual-licensed under the MIT License
+or the Apache License, Version 2.0, at your option. See the MIT and
+Apache-2.0 texts below for the canonical terms.
+
+This repository also contains source code vendored from upstream
+projects. Each vendored subtree retains its original license text
+verbatim in its own `LICENSE` (or `LICENSE.txt` / `NOTICE`) file and
+its upstream copyright headers are preserved unmodified in source
+files. The list of vendored sources and their licenses follows.
+
+================================================================
+Addendum A — ggml (vendored into third_party/ggml)
+================================================================
+
+The ggml kernel reference implementations vendored into this
+repository retain the MIT License terms published by the ggml
+authors. A copy of the original ggml LICENSE is in
+`third_party/ggml/LICENSE`. The ggml authors' copyright notice is
+reproduced verbatim below.
+
+    MIT License
+
+    Copyright (c) 2022-2024 Georgi Gerganov and ggml contributors
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+
+================================================================
+Addendum B — candle-core (vendored into third_party/candle-core)
+================================================================
+
+    MIT License
+
+    Copyright (c) 2024 Hugging Face, Inc. and candle contributors
+
+    Licensed under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+    either express or implied. See the License for the specific
+    language governing permissions and limitations under the
+    License.
+
+The full Apache-2.0 text is in `third_party/candle-core/LICENSE`.
+
+================================================================
+Addendum C — tract-linalg (vendored into third_party/tract-linalg)
+================================================================
+
+    Copyright (c) 2018 Sonos, Inc. and tract contributors
+
+    Dual-licensed under the MIT License or the Apache License,
+    Version 2.0. Full license texts are in
+    `third_party/tract-linalg/LICENSE-MIT` and
+    `third_party/tract-linalg/LICENSE-APACHE`.
+
+================================================================
+Addendum D — mistralrs-paged-attn (vendored into third_party/mistralrs-paged-attn)
+================================================================
+
+    MIT License
+
+    Copyright (c) 2024 Eric Buehler and mistral.rs contributors
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+
+The full text is also in `third_party/mistralrs-paged-attn/LICENSE`.
+
+================================================================
+Addendum E — TGI gRPC v3 protocol (vendored into third_party/tgi-proto)
+================================================================
+
+    Copyright 2024 Hugging Face, Inc.
+
+    Licensed under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+    either express or implied. See the License for the specific
+    language governing permissions and limitations under the
+    License.
+
+The full text is also in `third_party/tgi-proto/LICENSE`.
+
+================================================================
+Addendum F — Rust code original to this project
+================================================================
+
+Unless otherwise noted in source file headers, the Rust source files
+authored for this project (everything outside `third_party/` and
+outside the upstream `ds4/` C/Objective-C/CUDA/ROCm/Metal tree) are
+dual-licensed under the MIT License or the Apache License, Version
+2.0, at your option.
+
+    MIT License
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+
+    Apache License, Version 2.0
+
+    Licensed under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+    either express or implied. See the License for the specific
+    language governing permissions and limitations under the License.

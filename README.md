@@ -1,5 +1,11 @@
 # DwarfStar
 
+> Rekonquest fork note: this fork carries an experimental Rust rewrite in
+> [`ds4-rust/`](ds4-rust/). The Rust workspace is still under active
+> development, is pre-1.0, and should be treated as a development preview rather
+> than a stable production engine. The original C/CUDA/HIP/Metal tree is kept
+> intact for upstream comparison.
+
 **DwarfStar** is a small native inference engine optimized first for
 **DeepSeek V4 Flash**, with support for **DeepSeek V4 PRO** on very high-memory
 machines. It is

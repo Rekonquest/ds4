@@ -1,0 +1,103 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ds4-types",
+    "crates/ds4-gguf",
+    "crates/ds4-core",
+    "crates/ds4-quant",
+    "crates/ds4-tensor",
+    "crates/ds4-backend-cpu",
+    "crates/ds4-backend-cuda",
+    "crates/ds4-backend-metal",
+    "crates/ds4-backend-rocm",
+    "crates/ds4-backend-paged",
+    "crates/ds4-kvstore",
+    "crates/ds4-ssd",
+    "crates/ds4-dist",
+    "crates/ds4-cli",
+    "crates/ds4-server",
+    "crates/ds4-imatrix",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "MIT OR Apache-2.0"
+authors = ["DwarfStar contributors"]
+repository = "https://github.com/dwarfstar/ds4-rust"
+readme = "README.md"
+publish = false
+
+[workspace.dependencies]
+ds4-types = { path = "crates/ds4-types", version = "0.1.0" }
+ds4-gguf = { path = "crates/ds4-gguf", version = "0.1.0" }
+ds4-core = { path = "crates/ds4-core", version = "0.1.0" }
+ds4-quant = { path = "crates/ds4-quant", version = "0.1.0" }
+ds4-tensor = { path = "crates/ds4-tensor", version = "0.1.0" }
+ds4-backend-cpu = { path = "crates/ds4-backend-cpu", version = "0.1.0" }
+ds4-backend-cuda = { path = "crates/ds4-backend-cuda", version = "0.1.0" }
+ds4-backend-metal = { path = "crates/ds4-backend-metal", version = "0.1.0" }
+ds4-backend-rocm = { path = "crates/ds4-backend-rocm", version = "0.1.0" }
+ds4-backend-paged = { path = "crates/ds4-backend-paged", version = "0.1.0" }
+ds4-kvstore = { path = "crates/ds4-kvstore", version = "0.1.0" }
+ds4-ssd = { path = "crates/ds4-ssd", version = "0.1.0" }
+ds4-dist = { path = "crates/ds4-dist", version = "0.1.0" }
+ds4-cli = { path = "crates/ds4-cli", version = "0.1.0" }
+ds4-server = { path = "crates/ds4-server", version = "0.1.0" }
+ds4-imatrix = { path = "crates/ds4-imatrix", version = "0.1.0" }
+
+# External dependencies used across the workspace.
+thiserror = "2.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+parking_lot = "0.12"
+memmap2 = "0.9"
+half = { version = "2.4", features = ["serde"] }
+byteorder = "1.5"
+sha1 = "0.10"
+libc = "0.2"
+clap = { version = "4.5", features = ["derive"] }
+rustyline = "14.0"
+hyper = { version = "1.4", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "io-util", "sync"] }
+rand = "0.8"
+log = "0.4"
+env_logger = "0.11"
+crc32fast = "1.4"
+http-body-util = "0.1"
+bytes = "1"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "allow", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+similar_names = "allow"
+must_use_candidate = "allow"
+nursery = { level = "allow", priority = -1 }
+
+# v0.2: clippy::all is on (warn). The strict `-D warnings` gate is
+# enabled by `cargo clippy --workspace --lib -- -D warnings`. Per-crate
+# `#[allow(clippy::lint_name)]` allows cover specific cases that
+# aren't worth fixing in v0.2.
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 1
+debug = true

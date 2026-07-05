@@ -1,0 +1,24 @@
+# Cargo build artifacts.
+target/
+**/target/
+.zcode-memory/
+
+# Cargo lock is committed for application crates; deny will flag a future
+# mistake if a non-lib member leaves it inconsistent.
+# Cargo.lock
+
+# Editor scratch.
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS noise.
+.DS_Store
+Thumbs.db
+
+# Rust toolchain.
+**/*.rs.bk
+
+# Vendor-check output (CI writes here).
+tools/vendor-check.log
