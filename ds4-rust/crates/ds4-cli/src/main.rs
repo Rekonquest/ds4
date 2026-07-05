@@ -108,10 +108,11 @@ fn parse_backend(value: &str) -> Result<Ds4Backend, String> {
     match value.to_ascii_lowercase().as_str() {
         "cpu" => Ok(Ds4Backend::Cpu),
         "cuda" => Ok(Ds4Backend::Cuda),
+        "arc" | "intel-arc" | "xpu" => Ok(Ds4Backend::Arc),
         "rocm" => Ok(Ds4Backend::Rocm),
         "metal" => Ok(Ds4Backend::Metal),
         other => Err(format!(
-            "unknown backend {other:?}; expected cpu, cuda, rocm, or metal"
+            "unknown backend {other:?}; expected cpu, cuda, arc, rocm, or metal"
         )),
     }
 }
@@ -217,6 +218,8 @@ mod tests {
     fn parse_backend_accepts_supported_names() {
         assert_eq!(parse_backend("cpu").unwrap(), Ds4Backend::Cpu);
         assert_eq!(parse_backend("CUDA").unwrap(), Ds4Backend::Cuda);
+        assert_eq!(parse_backend("arc").unwrap(), Ds4Backend::Arc);
+        assert_eq!(parse_backend("xpu").unwrap(), Ds4Backend::Arc);
         assert!(parse_backend("bogus").is_err());
     }
 }

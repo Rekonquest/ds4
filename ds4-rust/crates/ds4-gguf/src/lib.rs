@@ -22,8 +22,13 @@ use std::sync::Arc;
 use ds4_types::{Ds4Error, Ds4ErrorKind, Ds4QuantKind, Ds4Result};
 use memmap2::Mmap;
 
+pub mod model_spec;
 pub mod synth;
-pub use synth::write_synthetic_gguf;
+pub use model_spec::{
+    ArchitectureKind, ExpertTensorLayout, FfnTensorNames, LayerTensorNames, ModelDims, ModelSpec,
+    MoeSpec, TransformerBlockKind,
+};
+pub use synth::{write_synthetic_gguf, write_synthetic_qwen_moe_gguf};
 
 // ---- GGUF v3 constants ----
 
@@ -215,6 +220,13 @@ impl KvRaw {
             _ => None,
         }
     }
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            KvRaw::F32(v) => Some((*v).into()),
+            KvRaw::F64(v) => Some(*v),
+            _ => None,
+        }
+    }
     pub fn as_str(&self) -> Option<&str> {
         match self {
             KvRaw::String(v) => Some(v.as_str()),
@@ -249,10 +261,15 @@ pub struct GgufMetadata {
     pub embedding_dim: Option<u32>,
     pub layer_count: Option<u32>,
     pub head_count: Option<u32>,
+    pub kv_head_count: Option<u32>,
     pub head_dim: Option<u32>,
+    pub feed_forward_length: Option<u32>,
     pub expert_count: Option<u32>,
     pub expert_used_count: Option<u32>,
+    pub shared_expert_count: Option<u32>,
     pub context_length: Option<u32>,
+    pub rope_freq_base: Option<f32>,
+    pub rms_norm_epsilon: Option<f32>,
     pub has_mtp: Option<bool>,
     pub routed_quant: Option<Ds4QuantKind>,
     pub shared_expert_quant: Option<Ds4QuantKind>,
@@ -450,6 +467,21 @@ impl GgufFile {
                     self.metadata.head_count = Some(v);
                 }
             }
+            "ds4.attention.head_count_kv" => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.kv_head_count = Some(v);
+                }
+            }
+            "ds4.attention.head_dim" => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.head_dim = Some(v);
+                }
+            }
+            "ds4.feed_forward_length" => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.feed_forward_length = Some(v);
+                }
+            }
             "ds4.expert_count" => {
                 if let Some(v) = val.as_u32() {
                     self.metadata.expert_count = Some(v);
@@ -460,9 +492,24 @@ impl GgufFile {
                     self.metadata.expert_used_count = Some(v);
                 }
             }
+            "ds4.expert_shared_count" => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.shared_expert_count = Some(v);
+                }
+            }
             "ds4.context_length" => {
                 if let Some(v) = val.as_u32() {
                     self.metadata.context_length = Some(v);
+                }
+            }
+            "ds4.rope.freq_base" => {
+                if let Some(v) = val.as_f64() {
+                    self.metadata.rope_freq_base = Some(v as f32);
+                }
+            }
+            "ds4.attention.layer_norm_rms_epsilon" => {
+                if let Some(v) = val.as_f64() {
+                    self.metadata.rms_norm_epsilon = Some(v as f32);
                 }
             }
             "ds4.has_mtp" => {
@@ -518,6 +565,66 @@ impl GgufFile {
             "general.alignment" => {
                 if let Some(v) = val.as_u32() {
                     self.metadata.alignment = v;
+                }
+            }
+            _ if key.ends_with(".embedding_length") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.embedding_dim = Some(v);
+                }
+            }
+            _ if key.ends_with(".block_count") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.layer_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".attention.head_count") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.head_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".attention.head_count_kv") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.kv_head_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".attention.key_length") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.head_dim = Some(v);
+                }
+            }
+            _ if key.ends_with(".feed_forward_length") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.feed_forward_length = Some(v);
+                }
+            }
+            _ if key.ends_with(".expert_count") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.expert_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".expert_used_count") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.expert_used_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".expert_shared_count") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.shared_expert_count = Some(v);
+                }
+            }
+            _ if key.ends_with(".context_length") => {
+                if let Some(v) = val.as_u32() {
+                    self.metadata.context_length = Some(v);
+                }
+            }
+            _ if key.ends_with(".rope.freq_base") => {
+                if let Some(v) = val.as_f64() {
+                    self.metadata.rope_freq_base = Some(v as f32);
+                }
+            }
+            _ if key.ends_with(".attention.layer_norm_rms_epsilon") => {
+                if let Some(v) = val.as_f64() {
+                    self.metadata.rms_norm_epsilon = Some(v as f32);
                 }
             }
             _ => {}

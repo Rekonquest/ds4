@@ -1,5 +1,5 @@
 [package]
-name = "ds4-backend-cuda"
+name = "ds4-backend-arc"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,17 +7,11 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "DS4 (DwarfStar) CUDA backend and kernel source port"
+description = "DS4 (DwarfStar) Intel Arc OpenCL backend"
 
 [lints]
 workspace = true
 
 [dependencies]
 ds4-types = { workspace = true }
-ds4-backend-cpu = { workspace = true }
 ds4-gguf = { workspace = true }
-ds4-quant = { workspace = true }
-ds4-tensor = { workspace = true }
-thiserror = { workspace = true }
-parking_lot = { workspace = true }
-libc = { workspace = true }

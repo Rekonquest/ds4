@@ -74,6 +74,7 @@ impl Ds4Engine {
         let mut backend: Box<dyn Backend> = match opts.backend {
             Ds4Backend::Cpu => Box::new(ds4_backend_cpu::CpuBackend::new()),
             Ds4Backend::Cuda => Box::new(ds4_backend_cuda::CudaBackend::new()),
+            Ds4Backend::Arc => Box::new(ds4_backend_arc::ArcBackend::new()),
             Ds4Backend::Rocm => Box::new(ds4_backend_rocm::RocmBackend::new()),
             Ds4Backend::Metal => Box::new(ds4_backend_metal::MetalBackend::new()),
         };
@@ -346,6 +347,7 @@ pub fn ds4_backend_name(b: Ds4Backend) -> &'static str {
     match b {
         Ds4Backend::Metal => "metal",
         Ds4Backend::Cuda => "cuda",
+        Ds4Backend::Arc => "arc",
         Ds4Backend::Rocm => "rocm",
         Ds4Backend::Cpu => "cpu",
     }

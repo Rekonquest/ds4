@@ -18,7 +18,9 @@ use crate::attention::attention_decode;
 use crate::matmul::matmul_f32;
 use crate::rmsnorm::rms_norm;
 use crate::rope::apply_rope;
-use ds4_gguf::{GgufDType, GgufFile, TensorDescriptor};
+use ds4_gguf::{
+    FfnTensorNames, GgufDType, GgufFile, LayerTensorNames, ModelSpec, TensorDescriptor,
+};
 use ds4_quant::f16::F16;
 use ds4_quant::iq2_xxs::{self, Iq2XxsBlock};
 use ds4_quant::q2_k::{self, Q2_KBlock};
@@ -37,6 +39,7 @@ pub struct CpuModel {
     tensors: HashMap<String, TensorData>,
     descriptor_index: HashMap<String, TensorDescriptor>,
     metadata: ds4_gguf::GgufMetadata,
+    spec: Option<ModelSpec>,
     n_elements: usize,
 }
 
@@ -203,6 +206,17 @@ impl CpuModel {
     }
 
     fn dims(&self) -> Ds4Result<ModelDims> {
+        if let Some(spec) = &self.spec {
+            let dims = spec.dims;
+            return Ok(ModelDims {
+                vocab: dims.vocab,
+                hidden: dims.hidden,
+                layers: dims.layers,
+                n_heads: dims.n_heads,
+                head_dim: dims.head_dim,
+                ffn: dims.ffn,
+            });
+        }
         let token_desc = self.descriptor_required("token_embd.weight")?;
         if token_desc.dims.len() != 2 {
             return Err(Ds4Error::new(
@@ -255,6 +269,26 @@ impl CpuModel {
             n_heads,
             head_dim,
             ffn,
+        })
+    }
+
+    fn layer_tensor_names(&self, layer: usize) -> Ds4Result<LayerTensorNames> {
+        if let Some(spec) = &self.spec {
+            return spec.layer_tensors(layer);
+        }
+        let prefix = format!("blk.{layer}");
+        Ok(LayerTensorNames {
+            attn_norm: format!("{prefix}.attn_norm.weight"),
+            attn_q: format!("{prefix}.attn_q.weight"),
+            attn_k: format!("{prefix}.attn_k.weight"),
+            attn_v: format!("{prefix}.attn_v.weight"),
+            attn_output: format!("{prefix}.attn_out.weight"),
+            ffn_norm: format!("{prefix}.ffn_norm.weight"),
+            ffn: FfnTensorNames::Dense {
+                gate: format!("{prefix}.ffn_gate.weight"),
+                up: format!("{prefix}.ffn_up.weight"),
+                down: format!("{prefix}.ffn_down.weight"),
+            },
         })
     }
 
@@ -537,22 +571,14 @@ impl CpuModel {
         v_cache: &mut [f32],
         dims: ModelDims,
     ) -> Ds4Result<()> {
-        let attn_norm_name = format!("blk.{layer}.attn_norm.weight");
-        let attn_q_name = format!("blk.{layer}.attn_q.weight");
-        let attn_k_name = format!("blk.{layer}.attn_k.weight");
-        let attn_v_name = format!("blk.{layer}.attn_v.weight");
-        let attn_out_name = format!("blk.{layer}.attn_out.weight");
-        let ffn_norm_name = format!("blk.{layer}.ffn_norm.weight");
-        let ffn_gate_name = format!("blk.{layer}.ffn_gate.weight");
-        let ffn_up_name = format!("blk.{layer}.ffn_up.weight");
-        let ffn_down_name = format!("blk.{layer}.ffn_down.weight");
+        let names = self.layer_tensor_names(layer)?;
 
         let mut attn_in = x.to_vec();
-        let attn_norm = self.f32_tensor(&attn_norm_name)?;
+        let attn_norm = self.f32_tensor(&names.attn_norm)?;
         if attn_norm.len() != dims.hidden {
             return Err(Ds4Error::new(
                 Ds4ErrorKind::Model,
-                format!("{attn_norm_name} length mismatch"),
+                format!("{} length mismatch", names.attn_norm),
             ));
         }
         rms_norm(&mut attn_in, attn_norm, 1e-6);
@@ -560,9 +586,9 @@ impl CpuModel {
         let mut q = vec![0.0f32; dims.hidden];
         let mut k = vec![0.0f32; dims.hidden];
         let mut v = vec![0.0f32; dims.hidden];
-        self.matvec_f32(&attn_in, &attn_q_name, &mut q)?;
-        self.matvec_f32(&attn_in, &attn_k_name, &mut k)?;
-        self.matvec_f32(&attn_in, &attn_v_name, &mut v)?;
+        self.matvec_f32(&attn_in, &names.attn_q, &mut q)?;
+        self.matvec_f32(&attn_in, &names.attn_k, &mut k)?;
+        self.matvec_f32(&attn_in, &names.attn_v, &mut v)?;
         apply_rope(&mut q, rope_pos, dims.n_heads, dims.head_dim, 10_000.0);
         apply_rope(&mut k, rope_pos, dims.n_heads, dims.head_dim, 10_000.0);
 
@@ -591,29 +617,39 @@ impl CpuModel {
         .map_err(|message| Ds4Error::new(Ds4ErrorKind::Model, message))?;
 
         let mut attn_proj = vec![0.0f32; dims.hidden];
-        self.matvec_f32(&attn, &attn_out_name, &mut attn_proj)?;
+        self.matvec_f32(&attn, &names.attn_output, &mut attn_proj)?;
         add_inplace(x, &attn_proj);
 
         let mut ffn_in = x.to_vec();
-        let ffn_norm = self.f32_tensor(&ffn_norm_name)?;
+        let ffn_norm = self.f32_tensor(&names.ffn_norm)?;
         if ffn_norm.len() != dims.hidden {
             return Err(Ds4Error::new(
                 Ds4ErrorKind::Model,
-                format!("{ffn_norm_name} length mismatch"),
+                format!("{} length mismatch", names.ffn_norm),
             ));
         }
         rms_norm(&mut ffn_in, ffn_norm, 1e-6);
 
-        let mut gate = vec![0.0f32; dims.ffn];
-        let mut up = vec![0.0f32; dims.ffn];
-        self.matvec_f32(&ffn_in, &ffn_gate_name, &mut gate)?;
-        self.matvec_f32(&ffn_in, &ffn_up_name, &mut up)?;
-        for (g, u) in gate.iter_mut().zip(up.iter()) {
-            *g = silu(*g) * *u;
+        match names.ffn {
+            FfnTensorNames::Dense { gate, up, down } => {
+                let mut gate_values = vec![0.0f32; dims.ffn];
+                let mut up_values = vec![0.0f32; dims.ffn];
+                self.matvec_f32(&ffn_in, &gate, &mut gate_values)?;
+                self.matvec_f32(&ffn_in, &up, &mut up_values)?;
+                for (g, u) in gate_values.iter_mut().zip(up_values.iter()) {
+                    *g = silu(*g) * *u;
+                }
+                let mut down_values = vec![0.0f32; dims.hidden];
+                self.matvec_f32(&gate_values, &down, &mut down_values)?;
+                add_inplace(x, &down_values);
+            }
+            FfnTensorNames::RoutedMoe { .. } => {
+                return Err(Ds4Error::new(
+                    Ds4ErrorKind::NotImplemented,
+                    "CPU routed-MoE FFN execution requires expert dispatch",
+                ));
+            }
         }
-        let mut down = vec![0.0f32; dims.hidden];
-        self.matvec_f32(&gate, &ffn_down_name, &mut down)?;
-        add_inplace(x, &down);
         Ok(())
     }
 }
@@ -665,6 +701,7 @@ impl CpuBackend {
         let mut cache = CpuModel::new();
         let mut total_elements: usize = 0;
         cache.metadata = gguf.metadata.clone();
+        cache.spec = Some(ModelSpec::from_gguf(gguf)?);
 
         for descriptor in &gguf.tensors {
             let n_elems: usize = descriptor.numel().try_into().map_err(|_| {

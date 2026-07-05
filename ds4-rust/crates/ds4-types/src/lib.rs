@@ -54,6 +54,7 @@ pub enum Ds4ErrorKind {
 pub enum Ds4Backend {
     Metal,
     Cuda,
+    Arc,
     Rocm,
     Cpu,
 }

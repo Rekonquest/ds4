@@ -8,6 +8,7 @@ members = [
     "crates/ds4-tensor",
     "crates/ds4-backend-cpu",
     "crates/ds4-backend-cuda",
+    "crates/ds4-backend-arc",
     "crates/ds4-backend-metal",
     "crates/ds4-backend-rocm",
     "crates/ds4-backend-paged",
@@ -37,6 +38,7 @@ ds4-quant = { path = "crates/ds4-quant", version = "0.1.0" }
 ds4-tensor = { path = "crates/ds4-tensor", version = "0.1.0" }
 ds4-backend-cpu = { path = "crates/ds4-backend-cpu", version = "0.1.0" }
 ds4-backend-cuda = { path = "crates/ds4-backend-cuda", version = "0.1.0" }
+ds4-backend-arc = { path = "crates/ds4-backend-arc", version = "0.1.0" }
 ds4-backend-metal = { path = "crates/ds4-backend-metal", version = "0.1.0" }
 ds4-backend-rocm = { path = "crates/ds4-backend-rocm", version = "0.1.0" }
 ds4-backend-paged = { path = "crates/ds4-backend-paged", version = "0.1.0" }

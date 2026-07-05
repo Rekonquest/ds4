@@ -9,7 +9,7 @@
 // - On machines without the CUDA toolkit, kernel compilation reports
 //   the missing toolchain while `load_model` uses a CPU-compatible path.
 
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, unsafe_code)]
 
 pub const CRATE_NAME: &str = "ds4-backend-cuda";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -17,6 +17,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod backend;
 pub mod buffers;
 pub mod kernels;
+pub mod runtime;
 
 pub use backend::{CudaBackend, CudaModel, KernelCache};
 pub use buffers::{Buffer, BufferPool, DType};

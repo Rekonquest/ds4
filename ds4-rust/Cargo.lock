@@ -249,6 +249,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ds4-backend-arc"
+version = "0.1.0"
+dependencies = [
+ "ds4-gguf",
+ "ds4-types",
+]
+
+[[package]]
 name = "ds4-backend-cpu"
 version = "0.1.0"
 dependencies = [
@@ -269,6 +277,7 @@ dependencies = [
  "ds4-quant",
  "ds4-tensor",
  "ds4-types",
+ "libc",
  "parking_lot",
  "thiserror",
 ]
@@ -332,6 +341,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "crc32fast",
+ "ds4-backend-arc",
  "ds4-backend-cpu",
  "ds4-backend-cuda",
  "ds4-backend-metal",

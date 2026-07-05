@@ -17,6 +17,7 @@ ds4-types = { workspace = true }
 ds4-gguf = { workspace = true }
 ds4-backend-cpu = { workspace = true }
 ds4-backend-cuda = { workspace = true }
+ds4-backend-arc = { workspace = true }
 ds4-backend-metal = { workspace = true }
 ds4-backend-rocm = { workspace = true }
 ds4-quant = { workspace = true }
